@@ -19,3 +19,8 @@ variable "machine_type" {
 variable "ssh_keys" {
   type = map(string)
 }
+
+variable "instance_desired_status" {
+  # See: https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_instance#desired_status
+  default = "RUNNING"
+}

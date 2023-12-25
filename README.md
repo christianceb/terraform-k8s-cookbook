@@ -3,7 +3,7 @@
 Terraform scripts to assist in learning K8s via disposable environments.
 
 ## Requirements
-1. Terraform `v1.6.4`
+1. Terraform — `v1.6.4` or above
 2. `gcloud` — if using Google Cloud recipes. Must be configured and authenticated
 
 ## Google Cloud
@@ -15,7 +15,7 @@ Service Account keys are intended to be banned from this cookbook.
 ### Google Compute Engine Unmanaged K8s (`gce-unmanaged-k8s`)
 
 - VPC + Subnet + Firewall
-- Two nodes/compute engines (`primus`, `secundus` (WIP))
+- Two nodes/compute engines (`primus`, `secundus` (WIP)). `tertius` a possibility.
 - Can accept public keys to automatically assign as `ssh` users
 - Cost effective
 - Slightly inconvenient to setup (very manual, may automate in the future with a shell script)

@@ -52,8 +52,13 @@ resource "google_project_iam_member" "sa-editor-binding" {
   member  = "serviceAccount:${google_service_account.sa.email}"
 }
 
-resource "google_compute_instance" "primus" {
-  name         = "primus"
+resource "google_compute_project_metadata" "ssh_keys" {
+  metadata = {
+    ssh-keys = join("\n", [for user, key_file in var.ssh_keys : "${user}:${file(key_file)}"])
+  }
+}
+
+resource "google_compute_instance_template" "k8s_node_template" {
   machine_type = var.machine_type
 
   network_interface {
@@ -64,7 +69,14 @@ resource "google_compute_instance" "primus" {
     subnetwork = google_compute_subnetwork.vpc-subnet.self_link
   }
 
+  disk {
+    source_image = data.google_compute_image.ubuntu.self_link
+    disk_size_gb = 20
+    disk_type    = "pd-standard"
+  }
+
   service_account {
+    email = google_service_account.sa.email
     scopes = [
       "https://www.googleapis.com/auth/devstorage.read_only",
       "https://www.googleapis.com/auth/logging.write",
@@ -75,18 +87,18 @@ resource "google_compute_instance" "primus" {
       # "cloud-platform", # Grant all service scopes with (may be dangerous)
     ]
   }
-
-  boot_disk {
-    initialize_params {
-      image = data.google_compute_image.ubuntu.self_link
-      size  = 20
-      type  = "pd-standard"
-    }
-  }
 }
 
-resource "google_compute_project_metadata" "ssh_keys" {
-  metadata = {
-    ssh-keys = join("\n", [for user, key_file in var.ssh_keys : "${user}:${file(key_file)}"])
-  }
+resource "google_compute_instance_from_template" "primus" {
+  name = "primus"
+
+  source_instance_template = google_compute_instance_template.k8s_node_template.self_link_unique
+
+  desired_status = var.instance_desired_status
 }
+
+# resource "google_compute_instance_from_template" "secundus" {
+#   name = "secundus"
+
+#   source_instance_template = google_compute_instance_template.k8s_node_template.self_link_unique
+# }
