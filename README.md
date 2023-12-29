@@ -6,13 +6,17 @@ Terraform scripts to assist in learning K8s via disposable environments.
 1. Terraform — `v1.6.4` or above
 2. `gcloud` — if using Google Cloud recipes. Must be configured and authenticated
 
-## Google Cloud
+# Templates
 
-### `gcp-token.sh` — Helper tool for managing GCP Access Tokens
+## Helper tool for managing GCP Access Tokens (`gcp-token.sh`)
 
 Service Account keys are intended to be banned from this cookbook.
 
-### Google Compute Engine Unmanaged K8s (`gce-unmanaged-k8s`)
+## State Management in Google Cloud Storage  (`gcp-state-buckets`)
+
+Store state of Terraform projects in Google Cloud
+
+## Google Compute Engine Unmanaged K8s (`gce-unmanaged-k8s`)
 
 - VPC + Subnet + Firewall
 - Two nodes/compute engines (`primus`, `secundus` (WIP)). `tertius` a possibility.
@@ -20,7 +24,7 @@ Service Account keys are intended to be banned from this cookbook.
 - Cost effective
 - Slightly inconvenient to setup (very manual, may automate in the future with a shell script)
 
-#### Example `terraform.tfvars`
+### Example `terraform.tfvars`
 ```terraform
 project_id = "cookbook"
 ssh_keys = {
@@ -30,7 +34,7 @@ ssh_keys = {
 
 Refer to `templates/gce-unmanaged-k8s/variables.tf` for overrides and definition
 
-#### Usage:
+### Usage:
 1. Note down your GCP project ID (create a project if you havent yet)
 2. On `templates/gce-unmanaged-k8s`, Create `terraform.tfvars`
 3. Pass `project_id` with the value retrieved earlier.
@@ -41,7 +45,7 @@ Refer to `templates/gce-unmanaged-k8s/variables.tf` for overrides and definition
    3. `terraform plan`
    4. `terraform apply` to finally apply changes
 
-### [Planned] Google Kubernetes Engine (`gke`)
+## [Planned] Google Kubernetes Engine (`gke`)
 
 - VPC + Subnet + Firewall
 - GKE
