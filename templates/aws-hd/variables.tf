@@ -11,15 +11,6 @@ variable "region" {
   default = "us-east-2"
 }
 
-variable "monthly_budget_usd" {
-  description = "How much are you willing to spend in USD every month?"
-}
-
-variable "monthly_overspend_notify" {
-  type = list(string)
-  description = "List of email addresses to notify once monthly spend has hit 100% and 125% of the budget"
-}
-
 variable "ssh_keys" {
   type = map(string)
   nullable = true
