@@ -5,6 +5,9 @@ terraform {
       version = "~> 5.0"
     }
   }
+
+  ## TODO: option to move state to AWS S3
+  # backend "aws" {}
 }
 
 provider "aws" {
@@ -25,56 +28,70 @@ output "primary_private_key" {
   sensitive = true
 }
 
+output "primary_public_key" {
+  value     = tls_private_key.primary_key_pair.public_key_openssh
+}
+
 resource "aws_key_pair" "primary_ssh_key" {
   key_name   = "primary"
   public_key = tls_private_key.primary_key_pair.public_key_openssh
 }
 
-resource "aws_key_pair" "secondary_ssh_keys" {
-  count = var.ssh_keys == null ? 0 : length(var.ssh_keys)
+# resource "aws_key_pair" "secondary_ssh_keys" {
+#   count = var.ssh_keys == null ? 0 : length(var.ssh_keys)
 
-  key_name   = keys(var.ssh_keys)[count.index]
-  public_key = file(values(var.ssh_keys)[count.index])
-}
+#   key_name   = keys(var.ssh_keys)[count.index]
+#   public_key = file(values(var.ssh_keys)[count.index])
+# }
 
-resource "aws_vpc" "vpc" {
+resource "aws_vpc" "this" {
   tags = {
     Name = "primary-vpc"
   }
 
+  enable_dns_hostnames = true
+
   cidr_block = "10.0.0.0/24"
 }
 
-resource "aws_internet_gateway" "internet_gateway" {
-  vpc_id = aws_vpc.vpc.id
+resource "aws_internet_gateway" "this" {
+  vpc_id = aws_vpc.this.id
 
   tags = {
-    Name = "${aws_vpc.vpc.tags.Name}-internet-gateway"
+    Name = "${aws_vpc.this.tags.Name}-internet-gateway"
   }
 }
 
-resource "aws_subnet" "subnet" {
+resource "aws_subnet" "this" {
   tags = {
-    Name = "${aws_vpc.vpc.tags.Name}-subnet"
+    Name = "${aws_vpc.this.tags.Name}-subnet"
   }
 
   availability_zone = local.availability_zone
-  cidr_block        = "10.0.0.0/24"
-  vpc_id            = aws_vpc.vpc.id
+  cidr_block        = aws_vpc.this.cidr_block
+  vpc_id            = aws_vpc.this.id
 
-  depends_on = [aws_internet_gateway.internet_gateway]
+  depends_on = [aws_internet_gateway.this]
 }
 
-resource "aws_security_group" "security_group" {
-  name        = "primary-security-group"
-  description = "Allow all traffic in this security group"
-  vpc_id      = aws_vpc.vpc.id
+resource "aws_security_group" "allow-ssh-http-outgoing-all" {
+  name        = "ssh-http-outgoing-all"
+  description = "Allow SSH, HTTP and all outgoing on this SG"
+  vpc_id      = aws_vpc.this.id
 
   ingress {
-    description = "Allow all incoming traffic"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    description = "Allow SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "TCP"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Allow HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "TCP"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -87,7 +104,7 @@ resource "aws_security_group" "security_group" {
   }
 
   tags = {
-    Name = "Primary - allow all traffic"
+    Name = "Allow SSH, HTTP and all outgoing traffic"
   }
 }
 
@@ -107,15 +124,34 @@ data "aws_ami" "ubuntu" {
   owners = ["099720109477"] # Canonical
 }
 
-resource "aws_ebs_volume" "development_volume" {
-  availability_zone = local.availability_zone
-  size              = var.development_ebs_volume_gbs
+resource "aws_route_table" "public" {
+  vpc_id = "${aws_vpc.this.id}"
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = "${aws_internet_gateway.this.id}"
+  }
 
   tags = {
-    Name = "development_volume"
+    Name = "rt-public"
   }
 }
 
+resource "aws_route_table_association" "rt-public-subnet" {
+  subnet_id      = "${aws_subnet.this.id}"
+  route_table_id = "${aws_route_table.public.id}"
+}
+
+# resource "aws_ebs_volume" "development_volume" {
+#   availability_zone = local.availability_zone
+#   size              = var.development_ebs_volume_gbs
+
+#   tags = {
+#     Name = "development_volume"
+#   }
+# }
+
+# TODO: prevent /dev/sda1 automatically getting populated. maybe check https://www.reddit.com/r/Terraform/comments/wu92wb/creating_aws_instance_from_ami_instantly_failing/
 resource "aws_instance" "development" {
   tags = {
     Name = "development"
@@ -124,20 +160,33 @@ resource "aws_instance" "development" {
   availability_zone = local.availability_zone
   ami               = data.aws_ami.ubuntu.id
   instance_type     = var.instance_type
-  subnet_id         = aws_subnet.subnet.id
+  subnet_id         = aws_subnet.this.id
   key_name          = aws_key_pair.primary_ssh_key.key_name
+  vpc_security_group_ids = [ aws_security_group.allow-ssh-http-outgoing-all.id ]
+
+  user_data = data.cloudinit_config.server_config.rendered
 }
 
-resource "aws_volume_attachment" "development_volume_attachment" {
-  device_name = "/dev/sda1"
-  instance_id = aws_instance.development.id
-  volume_id   = aws_ebs_volume.development_volume.id
+data "cloudinit_config" "server_config" {
+  gzip          = true
+  base64_encode = true
+  part {
+    content_type = "text/cloud-config"
+    content = file("first-run.yaml")
+  }
 }
 
-resource "aws_eip" "lb" {
+## Parked for future debugging
+# resource "aws_volume_attachment" "development_volume_attachment" {
+#   device_name = "/dev/sda1"
+#   instance_id = aws_instance.development.id
+#   volume_id   = aws_ebs_volume.development_volume.id
+# }
+
+resource "aws_eip" "elastic_ip" {
   instance = aws_instance.development.id
 
-  depends_on = [aws_internet_gateway.internet_gateway]
+  depends_on = [aws_internet_gateway.this]
 }
 
 ## Parked for later use
