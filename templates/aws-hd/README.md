@@ -21,6 +21,4 @@ https://stackoverflow.com/questions/49743220/how-to-create-an-ssh-key-in-terrafo
 terraform output -raw primary_private_key > id_ed25519.pem && chmod 400 id_ed25519.pem
 terraform output -raw primary_public_key > id_ed25519.pub
 
-terraform output -raw primary_private_key > id_ed25519.pem && chmod 400 id_ed25519.pem | terraform output -raw primary_public_key > id_ed25519.pub
-
 https://medium.com/@hmalgewatta/setting-up-an-aws-ec2-instance-with-ssh-access-using-terraform-c336c812322f
