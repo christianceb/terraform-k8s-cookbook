@@ -2,6 +2,8 @@
 
 https://docs.aws.amazon.com/cli/latest/userguide/cli-authentication-user.html#cli-authentication-user-configure-csv
 
+aws configure --profile bsdl-programmed
+
 # Region
 us-east-2
 

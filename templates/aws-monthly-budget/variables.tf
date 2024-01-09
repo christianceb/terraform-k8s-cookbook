@@ -2,6 +2,10 @@ variable "profile" {
   description = "The aws-cli profile name to use for this operation"
 }
 
+variable "project" {
+  description = "Give your project a name. Kebab-case names only"
+}
+
 variable "region" {
   description = "The target region for the operations. Any operation requiring a specific availability zone will default to \"a\""
   default = "us-east-2"

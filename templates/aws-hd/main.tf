@@ -35,6 +35,10 @@ output "primary_public_key" {
 resource "aws_key_pair" "primary_ssh_key" {
   key_name   = "primary"
   public_key = tls_private_key.primary_key_pair.public_key_openssh
+
+  tags = {
+    project-is = var.project
+  }
 }
 
 # resource "aws_key_pair" "secondary_ssh_keys" {
@@ -47,6 +51,7 @@ resource "aws_key_pair" "primary_ssh_key" {
 resource "aws_vpc" "this" {
   tags = {
     Name = "primary-vpc"
+    project-is = var.project
   }
 
   enable_dns_hostnames = true
@@ -59,12 +64,14 @@ resource "aws_internet_gateway" "this" {
 
   tags = {
     Name = "${aws_vpc.this.tags.Name}-internet-gateway"
+    project-is = var.project
   }
 }
 
 resource "aws_subnet" "this" {
   tags = {
     Name = "${aws_vpc.this.tags.Name}-subnet"
+    project-is = var.project
   }
 
   availability_zone = local.availability_zone
@@ -95,6 +102,14 @@ resource "aws_security_group" "allow-ssh-http-outgoing-all" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    description = "Allow HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "TCP"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     description = "Allow all outgoing traffic"
     from_port   = 0
@@ -105,6 +120,7 @@ resource "aws_security_group" "allow-ssh-http-outgoing-all" {
 
   tags = {
     Name = "Allow SSH, HTTP and all outgoing traffic"
+    project-is = var.project
   }
 }
 
@@ -134,6 +150,7 @@ resource "aws_route_table" "public" {
 
   tags = {
     Name = "rt-public"
+    project-is = var.project
   }
 }
 
@@ -142,19 +159,19 @@ resource "aws_route_table_association" "rt-public-subnet" {
   route_table_id = "${aws_route_table.public.id}"
 }
 
-# resource "aws_ebs_volume" "development_volume" {
-#   availability_zone = local.availability_zone
-#   size              = var.development_ebs_volume_gbs
+resource "aws_ebs_volume" "development" {
+  availability_zone = local.availability_zone
+  size              = var.development_ebs_volume_gbs
 
-#   tags = {
-#     Name = "development_volume"
-#   }
-# }
+  tags = {
+    Name = "development_volume"
+  }
+}
 
-# TODO: prevent /dev/sda1 automatically getting populated. maybe check https://www.reddit.com/r/Terraform/comments/wu92wb/creating_aws_instance_from_ami_instantly_failing/
 resource "aws_instance" "development" {
   tags = {
     Name = "development"
+    project-is = var.project
   }
 
   availability_zone = local.availability_zone
@@ -170,23 +187,27 @@ resource "aws_instance" "development" {
 data "cloudinit_config" "server_config" {
   gzip          = true
   base64_encode = true
+
   part {
     content_type = "text/cloud-config"
     content = file("first-run.yaml")
   }
 }
 
-## Parked for future debugging
-# resource "aws_volume_attachment" "development_volume_attachment" {
-#   device_name = "/dev/sda1"
-#   instance_id = aws_instance.development.id
-#   volume_id   = aws_ebs_volume.development_volume.id
-# }
+resource "aws_volume_attachment" "development" {
+  device_name = "/dev/sdh"
+  instance_id = aws_instance.development.id
+  volume_id   = aws_ebs_volume.development.id
+}
 
 resource "aws_eip" "elastic_ip" {
   instance = aws_instance.development.id
 
   depends_on = [aws_internet_gateway.this]
+
+  tags = {
+    project-is = var.project
+  }
 }
 
 ## Parked for later use
