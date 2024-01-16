@@ -35,3 +35,5 @@ terraform.rc
 
 # For any changes in Terraform Settings > Backend
 backend.tf
+
+.DS_Store

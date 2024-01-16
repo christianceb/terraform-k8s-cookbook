@@ -28,7 +28,24 @@ variable "instance_type" {
   default = "t3.medium"
 }
 
+variable "use_ebs_volume" {
+  default = false
+  type = bool
+}
+
 variable "development_ebs_volume_gbs" {
-  default = 30
+  default = 20
   type = number
+}
+
+variable "do_token" {
+  description = "A DigitalOcean token to be used when provisioning subdomains. (reference: https://docs.digitalocean.com/reference/api/create-personal-access-token/)"
+}
+
+variable "domain" {
+  description = "The domain to use to append to the subdomain. Note that this domain must exist on the DigitalOcean account tied to the token"
+}
+
+variable "subdomain" {
+  description = "The subdomain to be prepended to the domain"
 }

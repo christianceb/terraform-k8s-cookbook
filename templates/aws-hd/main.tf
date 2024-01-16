@@ -4,6 +4,11 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+
+    digitalocean = {
+      source  = "digitalocean/digitalocean"
+      version = "~> 2.0"
+    }
   }
 
   ## TODO: option to move state to AWS S3
@@ -19,22 +24,22 @@ locals {
   availability_zone = "${var.region}a"
 }
 
-resource "tls_private_key" "primary_key_pair" {
+resource "tls_private_key" "primary-key-pair" {
   algorithm = "ED25519"
 }
 
 output "primary_private_key" {
-  value     = tls_private_key.primary_key_pair.private_key_openssh
+  value     = tls_private_key.primary-key-pair.private_key_openssh
   sensitive = true
 }
 
 output "primary_public_key" {
-  value     = tls_private_key.primary_key_pair.public_key_openssh
+  value     = tls_private_key.primary-key-pair.public_key_openssh
 }
 
 resource "aws_key_pair" "primary_ssh_key" {
   key_name   = "primary"
-  public_key = tls_private_key.primary_key_pair.public_key_openssh
+  public_key = tls_private_key.primary-key-pair.public_key_openssh
 
   tags = {
     project-is = var.project
@@ -81,7 +86,7 @@ resource "aws_subnet" "this" {
   depends_on = [aws_internet_gateway.this]
 }
 
-resource "aws_security_group" "allow-ssh-http-outgoing-all" {
+resource "aws_security_group" "allow-ssh-http-tls-outgoing-all" {
   name        = "ssh-http-outgoing-all"
   description = "Allow SSH, HTTP and all outgoing on this SG"
   vpc_id      = aws_vpc.this.id
@@ -154,19 +159,29 @@ resource "aws_route_table" "public" {
   }
 }
 
-resource "aws_route_table_association" "rt-public-subnet" {
+resource "aws_route_table_association" "public-subnet" {
   subnet_id      = "${aws_subnet.this.id}"
   route_table_id = "${aws_route_table.public.id}"
 }
 
-resource "aws_ebs_volume" "development" {
-  availability_zone = local.availability_zone
-  size              = var.development_ebs_volume_gbs
+# resource "aws_ebs_volume" "development" {
+#   count = var.use_ebs_volume ? 1 : 0
 
-  tags = {
-    Name = "development_volume"
-  }
-}
+#   availability_zone = local.availability_zone
+#   size              = var.development_ebs_volume_gbs
+
+#   tags = {
+#     Name = "development_volume"
+#   }
+# }
+
+# resource "aws_volume_attachment" "development" {
+#   count = var.use_ebs_volume ? 1 : 0
+
+#   device_name = "/dev/sdh"
+#   instance_id = aws_instance.development.id
+#   volume_id   = aws_ebs_volume.development.id
+# }
 
 resource "aws_instance" "development" {
   tags = {
@@ -181,10 +196,10 @@ resource "aws_instance" "development" {
   key_name          = aws_key_pair.primary_ssh_key.key_name
   vpc_security_group_ids = [ aws_security_group.allow-ssh-http-outgoing-all.id ]
 
-  user_data = data.cloudinit_config.server_config.rendered
+  user_data = data.cloudinit_config.server-config.rendered
 }
 
-data "cloudinit_config" "server_config" {
+data "cloudinit_config" "server-config" {
   gzip          = true
   base64_encode = true
 
@@ -194,13 +209,11 @@ data "cloudinit_config" "server_config" {
   }
 }
 
-resource "aws_volume_attachment" "development" {
-  device_name = "/dev/sdh"
-  instance_id = aws_instance.development.id
-  volume_id   = aws_ebs_volume.development.id
+output "instance-ip" {
+  value     = aws_instance.development.public_ip
 }
 
-resource "aws_eip" "elastic_ip" {
+resource "aws_eip" "elastic-ip" {
   instance = aws_instance.development.id
 
   depends_on = [aws_internet_gateway.this]
@@ -219,3 +232,19 @@ resource "aws_eip" "elastic_ip" {
 #     Environment = "Dev"
 #   }
 # }
+
+resource "aws_ecr_repository" "backend" {
+  name = "${var.project}/backend"
+
+  tags = {
+    project-is = var.project
+  }
+}
+
+resource "aws_ecr_repository" "frontend" {
+  name = "${var.project}/frontend"
+
+  tags = {
+    project-is = var.project
+  }
+}
